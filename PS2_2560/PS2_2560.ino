@@ -32,6 +32,120 @@ byte vibrate = 0;
 
 void (* resetFunc) (void) = 0;
 
+#define SERIAL_SDK  Serial
+
+#define LOG_DEBUG
+
+#ifdef LOG_DEBUG
+#define M_LOG SERIAL_SDK.print
+#else
+#define M_LOG 
+#endif
+
+#define MAX_PWM   200
+#define MIN_PWM   130
+int Motor_PWM = 130;
+
+class SPDMotor {
+  public:
+  SPDMotor( int encoderA, int encoderB, int motorPWM, int motorDir1, int motorDir2 );
+
+  /// Set the PWM speed and direction pins.
+  /// pwm = 0, stop (no active control)
+  /// pwm = 1 to 255, proportion of CCW rotation
+  /// pwm = -1 to -255, proportion of CW rotation
+  void speed( int pwm );
+
+  /// Activate a SHORT BRAKE mode, which shorts the motor drive EM, clamping motion.
+  void hardStop();
+
+  /// Get the current speed.
+  int currentSpeed();
+
+  private:
+    int _encoderA, _encoderB;
+    int _motorPWM, _motorDir1, _motorDir2;
+
+    // Current speed setting.
+    int _speed;
+};
+
+SPDMotor::SPDMotor( int encoderA, int encoderB, int motorPWM, int motorDir1, int motorDir2 ) {
+  _encoderA = encoderA;
+  pinMode( _encoderA, INPUT );
+  _encoderB = encoderB;
+  pinMode( _encoderB, INPUT );
+
+  _motorPWM = motorPWM;
+  pinMode( _motorPWM, OUTPUT );
+  _motorDir1 = motorDir1;
+  pinMode( _motorDir1, OUTPUT );
+  _motorDir2 = motorDir2;
+  pinMode( _motorDir2, OUTPUT );
+}
+
+/// Set the PWM speed and direction pins.
+/// pwm = 0, stop (no active control)
+/// pwm = 1 to 255, proportion of CCW rotation
+/// pwm = -1 to -255, proportion of CW rotation
+void SPDMotor::speed( int speedPWM ) {
+  _speed = speedPWM;
+  if( speedPWM == 0 ) {
+    digitalWrite(_motorDir1,LOW);
+    digitalWrite(_motorDir2,LOW);
+    analogWrite( _motorPWM, 255);
+  } else if( speedPWM > 0 ) {
+    digitalWrite(_motorDir1, LOW );
+    digitalWrite(_motorDir2, HIGH );
+    analogWrite( _motorPWM, speedPWM < 255 ? speedPWM : 255);
+  } else if( speedPWM < 0 ) {
+    digitalWrite(_motorDir1, HIGH );
+    digitalWrite(_motorDir2, LOW );
+    analogWrite( _motorPWM, (-speedPWM) < 255 ? (-speedPWM): 255);
+  }
+}
+
+/// Activate a SHORT BRAKE mode, which shorts the motor drive EM, clamping motion.
+void SPDMotor::hardStop() {
+    _speed = 0;
+    digitalWrite(_motorDir1,HIGH);
+    digitalWrite(_motorDir2,HIGH);
+    analogWrite( _motorPWM, 0);
+}
+
+
+/// Get the current speed.
+int SPDMotor::currentSpeed() {
+    return _speed;
+}
+
+
+#define NEW_MOTOR
+#ifdef NEW_MOTOR
+
+SPDMotor *motorLF = new SPDMotor(18, 31, 12, 34, 35);
+SPDMotor *motorRF = new SPDMotor(38, 19,  8, 36, 37); // <- NOTE: Encoders and Motor Dir pins reversed for opposite operation
+SPDMotor *motorLR = new SPDMotor( 3, 49,  9, 43, 42);
+SPDMotor *motorRR = new SPDMotor( 23, 2,  5, 27, 26); // <- NOTE: Encoders and Motor Dir pins reversed for opposite operation
+
+#define MOTORA_FORWARD(pwm)    {motorLF->speed(pwm);}
+#define MOTORA_STOP(x)         {motorLF->speed(0);}
+#define MOTORA_BACKWARD(pwm)   {motorLF->speed(-pwm);}
+
+#define MOTORB_FORWARD(pwm)    {motorRF->speed(pwm);}
+#define MOTORB_STOP(x)         {motorRF->speed(0);}
+#define MOTORB_BACKWARD(pwm)   {motorRF->speed(-pwm);}
+
+#define MOTORC_FORWARD(pwm)    {motorLR->speed(pwm);}
+#define MOTORC_STOP(x)         {motorLR->speed(0);}
+#define MOTORC_BACKWARD(pwm)   {motorLR->speed(-pwm);}
+
+#define MOTORD_FORWARD(pwm)    {motorRR->speed(pwm);}
+#define MOTORD_STOP(x)         {motorRR->speed(0);}
+#define MOTORD_BACKWARD(pwm)   {motorRR->speed(-pwm);}
+
+#else 
+
 #define MOTORA_FORWARD(pwm)    do{digitalWrite(DIRA1,LOW); digitalWrite(DIRA2,HIGH);analogWrite(PWMA,pwm);}while(0)
 #define MOTORA_STOP(x)         do{digitalWrite(DIRA1,LOW); digitalWrite(DIRA2,LOW); analogWrite(PWMA,0);}while(0)
 #define MOTORA_BACKWARD(pwm)   do{digitalWrite(DIRA1,HIGH);digitalWrite(DIRA2,LOW); analogWrite(PWMA,pwm);}while(0)
@@ -48,19 +162,7 @@ void (* resetFunc) (void) = 0;
 #define MOTORD_STOP(x)         do{digitalWrite(DIRD1,LOW); digitalWrite(DIRD2,LOW); analogWrite(PWMD,0);}while(0)
 #define MOTORD_BACKWARD(pwm)   do{digitalWrite(DIRD1,LOW);digitalWrite(DIRD2,HIGH); analogWrite(PWMD,pwm);}while(0)
 
-#define SERIAL_SDK  Serial
-
-#define LOG_DEBUG
-
-#ifdef LOG_DEBUG
-#define M_LOG SERIAL_SDK.print
-#else
-#define M_LOG 
 #endif
-
-#define MAX_PWM   200
-#define MIN_PWM   130
-int Motor_PWM = 130;
 
 //控制电机运动    宏定义
 
@@ -318,7 +420,33 @@ void loop() {
     delay(20);
 
   }
-  if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) { //print stick values if either is TRUE
+  if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) {
+#ifdef NEW_MOTOR
+    int LY = ps2x.Analog(PSS_LY);
+    int LX = ps2x.Analog(PSS_LX);
+    int RX = ps2x.Analog(PSS_RX);
+    float forwardNormalized = (float)(-LY + 128)/127.f;
+    forwardNormalized = constrain( forwardNormalized, -1.f, 1.f );
+    float multiplier = (ps2x.Button(PSB_L1) && ps2x.Button(PSB_R1)) ? 255.f : 80.f;
+    int forward = (int)(pow(forwardNormalized, 2.0) * multiplier);
+
+    // Preserve the direction of movement.
+    if( forwardNormalized < 0 ) {
+      forward = -forward;
+    }
+ 
+    int right = -RX + 127;
+    int ccwTurn = (LX - 127)/2;
+    Serial.print( "fwd: " );
+    Serial.print( forward );
+    Serial.print( ", right: " );
+    Serial.print( right );
+    Serial.print( ", turn: " );
+    Serial.println( ccwTurn );
+
+    motorLF->speed(forward + ccwTurn - right); motorRF->speed(forward - ccwTurn + right);
+    motorLR->speed(forward - ccwTurn - right); motorRR->speed(forward + ccwTurn + right);
+#else
     Serial.print("Stick Values:");
     Serial.print(ps2x.Analog(PSS_LY), DEC); //Left stick, Y axis. Other options: LX, RY, RX
     Serial.print(",");
@@ -338,35 +466,50 @@ void loop() {
 
      Motor_PWM = 1.5 * (127 - LY);
       ADVANCE();
-      delay(20);
+      delay(2);
     }
     //后退
     if (LY > 127)
     {
       Motor_PWM = 1.5 * (LY - 128);
       BACK();
-      delay(20);
+      delay(2);
     }
     //左转
     if (LX < 128)
     {
       Motor_PWM = 1.5 * (127 - LX);
        LEFT_1();
-      delay(20);
+      delay(2);
     }
     //右转
     if (LX > 128)
     {
       Motor_PWM = 1.5 * (LX - 128);
       RIGHT_3();
-      delay(20);
+      delay(2);
     }
     //如果摇杆居中
     if (LY >= 128 && LY <= 128 && LX >= 128 && LX <= 128)
     {
       STOP();
-      delay(20);
+      delay(2);
     }
+#endif
 
+  } else {
+#ifdef NEW_MOTOR
+  if( motorLF->currentSpeed() != 0
+  || motorRF->currentSpeed() != 0
+  || motorLR->currentSpeed() != 0
+  || motorRR->currentSpeed() != 0 )
+  {
+      motorLF->hardStop(); motorRF->hardStop();
+      motorLR->hardStop(); motorRR->hardStop();
+      delay(500);
+      motorLF->speed(0); motorRF->speed(0);
+      motorLR->speed(0); motorRR->speed(0);
+  }
+#endif
   }
 }
