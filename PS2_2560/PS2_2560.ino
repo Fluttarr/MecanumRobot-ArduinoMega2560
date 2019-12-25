@@ -48,12 +48,12 @@ void (* resetFunc) (void) = 0;
 #define MOTORD_STOP(x)         do{digitalWrite(DIRD1,LOW); digitalWrite(DIRD2,LOW); analogWrite(PWMD,0);}while(0)
 #define MOTORD_BACKOFF(pwm)    do{digitalWrite(DIRD1,LOW);digitalWrite(DIRD2,HIGH); analogWrite(PWMD,pwm);}while(0)
 
-#define SERIAL  Serial
+#define SERIAL_SDK  Serial
 
 #define LOG_DEBUG
 
 #ifdef LOG_DEBUG
-#define M_LOG SERIAL.print
+#define M_LOG SERIAL_SDK.print
 #else
 #define M_LOG 
 #endif
@@ -151,9 +151,9 @@ void STOP()
 void UART_Control()
 {
   char Uart_Date=0;
- if(SERIAL.available())
+ if(SERIAL_SDK.available())
   {
-   Uart_Date = SERIAL.read();
+   Uart_Date = SERIAL_SDK.read();
   }
   switch(Uart_Date)
   {
@@ -243,7 +243,7 @@ void setup()
   }
   IO_init();
   
-//  SERIAL.print("Start");
+//  SERIAL_SDK.print("Start");
 }
 
 
