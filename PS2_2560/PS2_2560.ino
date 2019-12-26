@@ -1,4 +1,13 @@
- #include <PS2X_lib.h> 
+// NOTE: requires the Encoder library.
+// 1) open Tools -> Manage Libraries...
+// 2) install "Encoder" by Paul Stoffregen v1.4.1
+#include <Encoder.h>
+
+// NOTE: Requires the PS2X_lib installed.
+// 1) open Sketch -> Include Library -> Add .ZIP Library
+// 2) select "PS2X_lib.zip"
+#include <PS2X_lib.h>
+ 
 //电机引脚
 #define PWMA 12    //A电机转速
 #define DIRA1 34 
@@ -46,9 +55,14 @@ void (* resetFunc) (void) = 0;
 #define MIN_PWM   130
 int Motor_PWM = 130;
 
+#define NEW_MOTOR
+#ifdef NEW_MOTOR
+
+// --- SPD Motor ---
+
 class SPDMotor {
   public:
-  SPDMotor( int encoderA, int encoderB, int motorPWM, int motorDir1, int motorDir2 );
+  SPDMotor( int encoderA, int encoderB, bool encoderReversed, int motorPWM, int motorDir1, int motorDir2 );
 
   /// Set the PWM speed and direction pins.
   /// pwm = 0, stop (no active control)
@@ -60,21 +74,23 @@ class SPDMotor {
   void hardStop();
 
   /// Get the current speed.
-  int currentSpeed();
+  int getSpeed();
+
+  /// Get the current rotation position from the encoder.
+  long getEncoderPosition();
 
   private:
-    int _encoderA, _encoderB;
+    Encoder *_encoder;
+    bool _encoderReversed;
     int _motorPWM, _motorDir1, _motorDir2;
 
     // Current speed setting.
     int _speed;
 };
 
-SPDMotor::SPDMotor( int encoderA, int encoderB, int motorPWM, int motorDir1, int motorDir2 ) {
-  _encoderA = encoderA;
-  pinMode( _encoderA, INPUT );
-  _encoderB = encoderB;
-  pinMode( _encoderB, INPUT );
+SPDMotor::SPDMotor( int encoderA, int encoderB, bool encoderReversed, int motorPWM, int motorDir1, int motorDir2 ) {
+  _encoder = new Encoder(encoderA, encoderB);
+  _encoderReversed = encoderReversed;
 
   _motorPWM = motorPWM;
   pinMode( _motorPWM, OUTPUT );
@@ -113,20 +129,21 @@ void SPDMotor::hardStop() {
     analogWrite( _motorPWM, 0);
 }
 
-
 /// Get the current speed.
-int SPDMotor::currentSpeed() {
+int SPDMotor::getSpeed() {
     return _speed;
 }
 
+/// Get the current rotation position from the encoder.
+long SPDMotor::getEncoderPosition() {
+  long position = _encoder->read();
+  return _encoderReversed ? -position : position;
+}
 
-#define NEW_MOTOR
-#ifdef NEW_MOTOR
-
-SPDMotor *motorLF = new SPDMotor(18, 31, 12, 34, 35);
-SPDMotor *motorRF = new SPDMotor(38, 19,  8, 36, 37); // <- NOTE: Encoders and Motor Dir pins reversed for opposite operation
-SPDMotor *motorLR = new SPDMotor( 3, 49,  9, 43, 42);
-SPDMotor *motorRR = new SPDMotor( 23, 2,  5, 27, 26); // <- NOTE: Encoders and Motor Dir pins reversed for opposite operation
+SPDMotor *motorLF = new SPDMotor(18, 31, true, 12, 34, 35); // <- Encoder reversed to make +position measurement be forward.
+SPDMotor *motorRF = new SPDMotor(19, 38, false, 8, 36, 37); // <- NOTE: Motor Dir pins reversed for opposite operation
+SPDMotor *motorLR = new SPDMotor( 3, 49, true,  9, 43, 42); // <- Encoder reversed to make +position measurement be forward.
+SPDMotor *motorRR = new SPDMotor( 2, 23, false, 5, 27, 26); // <- NOTE: Motor Dir pins reversed for opposite operation
 
 #define MOTORA_FORWARD(pwm)    {motorLF->speed(pwm);}
 #define MOTORA_STOP(x)         {motorLF->speed(0);}
@@ -366,7 +383,7 @@ void loop() {
   else  { //DualShock Controller
     ps2x.read_gamepad(false, vibrate); //read controller and set large motor to spin at 'vibrate' speed
 
-
+#ifndef NEW_MOTOR
 //start 开始运行，电机初PWM为120；
     if (ps2x.Button(PSB_START))  {
       Serial.println("Start is being held");
@@ -418,8 +435,9 @@ void loop() {
       RIGHT_2();
     }
     delay(20);
-
+#endif // #ifndef NEW_MOTOR
   }
+
   if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) {
 #ifdef NEW_MOTOR
     int LY = ps2x.Analog(PSS_LY);
@@ -437,12 +455,20 @@ void loop() {
  
     int right = -RX + 127;
     int ccwTurn = (LX - 127)/2;
-    Serial.print( "fwd: " );
+    Serial.print( "fwd:" );
     Serial.print( forward );
-    Serial.print( ", right: " );
+    Serial.print( " r:" );
     Serial.print( right );
-    Serial.print( ", turn: " );
-    Serial.println( ccwTurn );
+    Serial.print( " ∆°:" );
+    Serial.print( ccwTurn );
+    Serial.print( " LF:" );
+    Serial.print( motorLF->getEncoderPosition() );
+    Serial.print( " RF:" );
+    Serial.print( motorRF->getEncoderPosition() );
+    Serial.print( " LR:" );
+    Serial.print( motorLR->getEncoderPosition() );
+    Serial.print( " RR:" );
+    Serial.println( motorRR->getEncoderPosition() );
 
     motorLF->speed(forward + ccwTurn - right); motorRF->speed(forward - ccwTurn + right);
     motorLR->speed(forward - ccwTurn - right); motorRR->speed(forward + ccwTurn + right);
@@ -499,10 +525,10 @@ void loop() {
 
   } else {
 #ifdef NEW_MOTOR
-  if( motorLF->currentSpeed() != 0
-  || motorRF->currentSpeed() != 0
-  || motorLR->currentSpeed() != 0
-  || motorRR->currentSpeed() != 0 )
+  if( motorLF->getSpeed() != 0
+  || motorRF->getSpeed() != 0
+  || motorLR->getSpeed() != 0
+  || motorRR->getSpeed() != 0 )
   {
       motorLF->hardStop(); motorRF->hardStop();
       motorLR->hardStop(); motorRR->hardStop();
