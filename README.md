@@ -1,6 +1,6 @@
 
 # Welcome
-This is the example project for the MEGA2560 board by [MobiusTech](http://www.mbeus.com/)
+This is an example project for the MEGA2560 board by [MobiusTech](http://www.mbeus.com/)
 
 This controller includes:
 * MEGA2560 board
@@ -12,9 +12,17 @@ This controller includes:
 This kit can drive a 4-wheel Mecanum wheel robot.
 It can move forward, backward, turn, and move sidesway.
 
-We hope you enjoy the project, and explore the many possibilities available on the driver board.  It contains reserve servos interface for controling a robot arm, or operate as a self-driving robot after adding a gyroscope and sonar.
+## Driving Instructions
+* Holding L1 or R1 will activate analog joystick control. Letting go will stop.
+* Left analog stick for forward/back and turning.
+* Right analog stick for sideways movement.
+* Hold both L1 and R1 for full-speed.
 
-# Extra Credits
+Forward movement read by the encoders will give rumble feedback on the PS2 controller.
+
+We hope you enjoy the project, and explore the many possibilities available on the driver board.  It contains reserve servos interface for controlling a robot arm, or operate as a self-driving robot after adding a gyroscope and sonar.
+
+# Contributor Credits
 
 ## Aaron Hilton, [Steampunk Digital](https://Steampunk.Digital)
 * Assembly Instructions

@@ -125,11 +125,11 @@ void setup()
   if (error == 0) {
     Serial.println("Found Controller, configuration successful ");
     Serial.println();
-    Serial.println("Advanced motor control by Aaron Hilton of Steampunk Digital");
-    Serial.println("===========================================================");
+    Serial.println("SPDMotor control by Aaron Hilton of Steampunk Digital");
+    Serial.println("=====================================================");
     Serial.println("Holding L1 or R1 will activate analog joystick control.");
-    Serial.println("Left Joystick for forward/back and turning.");
-    Serial.println("Right Joystick for sideways movement.");
+    Serial.println("Left analog stick for forward/back and turning.");
+    Serial.println("Right analog stick for sideways movement.");
     Serial.println("Hold both L1 and R1 for full-speed.");
   }
   else if (error == 1)
