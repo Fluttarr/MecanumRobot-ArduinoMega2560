@@ -16,8 +16,8 @@
 
 // #define pressures   true
 #define pressures   false
-// #define rumble      true
-#define rumble      false
+#define rumble      true
+//#define rumble      false
 PS2X ps2x; // create PS2 Controller Class
 
 int error = 0;
@@ -169,6 +169,15 @@ void loop() {
     return;
   }
   else  { //DualShock Controller
+    static long oldSumPosition = 0;
+    long sumPosition = motorLF->getEncoderPosition() + motorRF->getEncoderPosition() + motorLR->getEncoderPosition() + motorRR->getEncoderPosition();
+    long deltaPosition = sumPosition - oldSumPosition;
+    oldSumPosition = sumPosition;
+    Serial.print("∆pos: ");
+    Serial.print(deltaPosition);
+    long posVibrate = abs(deltaPosition);
+    posVibrate = posVibrate > 255 ? 255 : 0;
+    vibrate = (byte)posVibrate;
     ps2x.read_gamepad(false, vibrate); //read controller and set large motor to spin at 'vibrate' speed
 
     if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) {
@@ -188,7 +197,7 @@ void loop() {
    
       int right = -RX + 127;
       int ccwTurn = (LX - 127)/2;
-      Serial.print( "fwd:" );
+      Serial.print( " fwd:" );
       Serial.print( forward );
       Serial.print( " r:" );
       Serial.print( right );
